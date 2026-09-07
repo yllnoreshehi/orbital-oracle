@@ -1,0 +1,16 @@
+{
+  "name": "orbital-oracle",
+  "version": "1.0.0",
+  "description": "Daily horoscope from your real natal chart — plus the satellites the ancients never had to deal with.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/test.js",
+    "refresh-tles": "node tools/refresh-tles.js",
+    "serve": "npx serve ."
+  },
+  "devDependencies": {
+    "astronomy-engine": "^2.1.19",
+    "satellite.js": "^5.0.0",
+    "tz-lookup": "^6.1.25"
+  }
+}

@@ -1,0 +1,201 @@
+/* Orbital Oracle — night-sky reading room */
+:root {
+  --ink: #e8e4d8;
+  --ink-dim: #9a94a8;
+  --ink-faint: #6a6478;
+  --gold: #d4b46a;
+  --gold-soft: #b89d5e;
+  --bg: #0a0a14;
+  --card: rgba(20, 19, 34, 0.82);
+  --card-line: rgba(212, 180, 106, 0.22);
+  --serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% -10%, #1a1830 0%, var(--bg) 55%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.55;
+}
+
+/* starfield */
+.stars, .stars::before, .stars::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-repeat: repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+.stars {
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, #fff9 50%, transparent 51%),
+    radial-gradient(1px 1px at 68% 8%, #fff7 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 33% 64%, #ffe9b855 50%, transparent 51%),
+    radial-gradient(1px 1px at 84% 41%, #fff6 50%, transparent 51%),
+    radial-gradient(1px 1px at 47% 89%, #fff5 50%, transparent 51%),
+    radial-gradient(2px 2px at 91% 74%, #ffe9b833 50%, transparent 51%),
+    radial-gradient(1px 1px at 21% 47%, #fff4 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 33%, #fff8 50%, transparent 51%);
+  background-size: 520px 520px;
+}
+.stars::before {
+  background-image:
+    radial-gradient(1px 1px at 76% 61%, #fff6 50%, transparent 51%),
+    radial-gradient(1px 1px at 8% 79%, #fff5 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 41% 12%, #fff7 50%, transparent 51%),
+    radial-gradient(1px 1px at 63% 92%, #ffe9b844 50%, transparent 51%);
+  background-size: 340px 340px;
+}
+
+.wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 3rem 1.2rem 4rem; }
+
+/* masthead */
+.masthead { text-align: center; margin-bottom: 2.5rem; }
+.masthead-glyph { color: var(--gold-soft); letter-spacing: .8em; font-size: 1rem; margin-bottom: .6rem; }
+h1 {
+  font-weight: 600; font-size: clamp(2.4rem, 6vw, 3.6rem);
+  margin: 0 0 .4rem; letter-spacing: .06em;
+  color: var(--gold);
+  text-shadow: 0 0 34px rgba(212, 180, 106, .35);
+}
+.subtitle { font-style: italic; font-size: 1.2rem; margin: 0; color: var(--ink); }
+.subtitle-dim { color: var(--ink-dim); font-size: 1.02rem; }
+
+/* cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  padding: 1.8rem 2rem;
+  margin-bottom: 1.6rem;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+}
+.card-title {
+  font-size: 1.05rem; font-weight: 600; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--gold-soft);
+  margin: 0 0 1.2rem;
+}
+.card-subtitle {
+  font-size: .92rem; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--gold-soft); margin: 1.6rem 0 .6rem;
+}
+.now-note { text-transform: none; letter-spacing: 0; color: var(--ink-faint); font-style: italic; }
+
+/* form */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid .span2 { grid-column: 1 / -1; }
+label { display: flex; flex-direction: column; gap: .35rem; font-style: italic; color: var(--ink-dim); font-size: .98rem; }
+input {
+  font-family: var(--mono); font-size: .95rem;
+  background: rgba(10, 10, 22, .75);
+  color: var(--ink);
+  border: 1px solid rgba(212, 180, 106, .3);
+  border-radius: 6px;
+  padding: .6rem .7rem;
+  color-scheme: dark;
+}
+input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,180,106,.15); }
+.advanced { margin-top: 1rem; color: var(--ink-faint); }
+.advanced summary { cursor: pointer; font-style: italic; font-size: .95rem; }
+.advanced .grid { margin-top: .8rem; }
+
+button[type="submit"] {
+  margin-top: 1.4rem;
+  width: 100%;
+  font-family: var(--serif); font-size: 1.15rem; font-style: italic; letter-spacing: .08em;
+  color: #14122a;
+  background: linear-gradient(180deg, #e8cd8a, var(--gold));
+  border: none; border-radius: 8px;
+  padding: .8rem 1rem;
+  cursor: pointer;
+  transition: filter .15s ease, transform .05s ease;
+}
+button[type="submit"]:hover { filter: brightness(1.08); }
+button[type="submit"]:active { transform: translateY(1px); }
+button[type="submit"]:disabled { filter: grayscale(.6) brightness(.8); cursor: wait; }
+.ghost-btn {
+  font-family: var(--serif); font-style: italic; font-size: 1rem;
+  background: none; color: var(--ink-dim);
+  border: 1px solid rgba(212,180,106,.3); border-radius: 8px;
+  padding: .5rem 1.2rem; cursor: pointer; margin-top: 1.2rem;
+}
+.ghost-btn:hover { color: var(--gold); border-color: var(--gold); }
+.form-note { min-height: 1.3em; font-style: italic; color: var(--ink-dim); font-size: .95rem; margin: .8rem 0 0; }
+.form-note.err { color: #d88; }
+
+/* message — the book page */
+.message-card { text-align: center; padding: 2.6rem 2.4rem; }
+.message-date {
+  font-family: var(--mono); font-size: .8rem; letter-spacing: .25em;
+  text-transform: uppercase; color: var(--ink-faint); margin: 0 0 1.4rem;
+}
+.message-greeting {
+  font-size: 1.9rem; font-weight: 600; font-style: italic;
+  margin: 0 0 .2rem; color: var(--ink);
+}
+.message-tagline { font-style: italic; font-size: 1.25rem; color: var(--ink); margin: 0 0 1.6rem; }
+.message-body p {
+  font-style: italic; font-size: 1.22rem; line-height: 1.7;
+  color: var(--ink); max-width: 34em; margin: 0 auto 1.3em;
+}
+.message-body p.sat-para {
+  border-top: 1px solid var(--card-line);
+  padding-top: 1.4em;
+  color: #cfd8e8;
+}
+
+/* wheel */
+.wheel-card { text-align: center; }
+#wheel svg { width: 100%; max-width: 560px; height: auto; display: block; margin: 0 auto; }
+.wheel-legend { font-style: italic; color: var(--ink-faint); font-size: .95rem; max-width: 32em; margin: 1rem auto 0; }
+
+/* tables */
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: .88rem; }
+th { text-align: left; font-weight: 500; color: var(--ink-faint); font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; padding: .45rem .6rem; border-bottom: 1px solid var(--card-line); }
+td { padding: .45rem .6rem; border-bottom: 1px solid rgba(212,180,106,.08); }
+td.glyph { font-size: 1.1rem; color: var(--gold); }
+td .rx { color: #d88; font-size: .78rem; margin-left: .3rem; }
+.data-note { font-style: italic; color: var(--ink-faint); font-size: .92rem; }
+
+.foot { text-align: center; color: var(--ink-faint); font-size: .92rem; font-style: italic; margin-top: 2.5rem; }
+.foot a { color: var(--gold-soft); }
+.foot-dim { opacity: .75; }
+
+.hidden { display: none; }
+
+/* share overlay */
+#share-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(5, 5, 12, .85);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.2rem;
+}
+.share-box { max-width: 420px; width: 100%; text-align: center; }
+.share-box img {
+  width: 100%; height: auto; max-height: 70vh; object-fit: contain;
+  border: 1px solid var(--card-line); border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.share-actions { display: flex; gap: .6rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap; }
+.share-actions button {
+  font-family: var(--serif); font-style: italic; font-size: 1rem;
+  background: none; color: var(--gold); cursor: pointer;
+  border: 1px solid rgba(212,180,106,.4); border-radius: 8px; padding: .5rem 1.1rem;
+}
+.share-actions button:hover { border-color: var(--gold); }
+.share-hint { font-style: italic; color: var(--ink-faint); font-size: .88rem; }
+
+@media (max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
+  .card { padding: 1.3rem 1.1rem; }
+  .message-card { padding: 1.8rem 1.2rem; }
+  body { font-size: 17px; }
+}

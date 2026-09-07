@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orbital Oracle — the stars have spoken (so have the satellites)</title>
+  <meta name="description" content="A daily horoscope computed from your real birth chart — and from the several thousand satellites the ancients never had to deal with.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+
+  <main class="wrap">
+    <header class="masthead">
+      <div class="masthead-glyph" aria-hidden="true">☾ ✦ 🛰</div>
+      <h1>Orbital Oracle</h1>
+      <p class="subtitle">The stars have spoken about your day.<br>
+        <span class="subtitle-dim">So, unfortunately, have the satellites.</span></p>
+    </header>
+
+    <!-- ————— birth data ————— -->
+    <section class="card form-card" id="form-card">
+      <h2 class="card-title">Your celestial paperwork</h2>
+      <form id="birth-form" autocomplete="off">
+        <div class="grid">
+          <label>Date of birth
+            <input type="date" id="in-date" required min="1900-01-01" max="2035-12-31">
+          </label>
+          <label>Time of birth
+            <input type="time" id="in-time" required value="12:00">
+          </label>
+          <label class="span2">Place of birth
+            <input type="text" id="in-place" placeholder="City, Country — e.g. Fribourg, Switzerland" required>
+          </label>
+        </div>
+        <details class="advanced">
+          <summary>Enter coordinates manually</summary>
+          <div class="grid">
+            <label>Latitude <input type="number" id="in-lat" step="any" min="-90" max="90" placeholder="46.806"></label>
+            <label>Longitude <input type="number" id="in-lon" step="any" min="-180" max="180" placeholder="7.162"></label>
+          </div>
+        </details>
+        <button type="submit" id="btn-consult">Consult the heavens</button>
+        <p class="form-note" id="form-status"></p>
+      </form>
+    </section>
+
+    <!-- ————— reading ————— -->
+    <section class="reading hidden" id="reading">
+      <article class="card message-card">
+        <p class="message-date" id="msg-date"></p>
+        <h2 class="message-greeting" id="msg-greeting"></h2>
+        <p class="message-tagline" id="msg-tagline"></p>
+        <div class="message-body" id="msg-body"></div>
+        <button type="button" class="ghost-btn" id="btn-share">Share as image ✦</button>
+      </article>
+
+      <article class="card wheel-card">
+        <h2 class="card-title">Your chart, annotated by modernity</h2>
+        <div id="wheel"></div>
+        <p class="wheel-legend">Inner ring: the planets, as tradition demands.
+          Outer markers (🛰): objects in low Earth orbit that did not ask permission.</p>
+      </article>
+
+      <article class="card table-card">
+        <h2 class="card-title">Placements</h2>
+        <div class="table-scroll">
+          <table id="tbl-planets">
+            <thead><tr><th></th><th>Body</th><th>Sign</th><th>Degree</th><th>House</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <h3 class="card-subtitle">Satellite transits <span class="now-note">(right now)</span></h3>
+        <div class="table-scroll">
+          <table id="tbl-sats">
+            <thead><tr><th></th><th>Object</th><th>Sign</th><th>Natal house</th><th>Sky</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="data-note" id="data-note"></p>
+        <button type="button" class="ghost-btn" id="btn-again">New chart</button>
+      </article>
+    </section>
+
+    <footer class="foot">
+      <p>Planetary positions computed locally with
+        <a href="https://github.com/cosinekitty/astronomy" rel="noopener">astronomy-engine</a> ·
+        satellite orbits via <a href="https://celestrak.org" rel="noopener">CelesTrak</a> &
+        <a href="https://github.com/shashwatak/satellite-js" rel="noopener">satellite.js</a> ·
+        houses: Placidus</p>
+      <p class="foot-dim">For entertainment. The satellites hold no opinion of you. Probably.</p>
+    </footer>
+  </main>
+
+  <script src="js/vendor/astronomy.browser.min.js"></script>
+  <script src="js/vendor/satellite.min.js"></script>
+  <script src="js/vendor/tz.js"></script>
+  <script src="data/tle-fallback.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/satellites.js"></script>
+  <script src="js/horoscope.js"></script>
+  <script src="js/share.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

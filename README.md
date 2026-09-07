@@ -14,8 +14,8 @@ orbital data, because no birth chart drawn after 1957 is truly complete.
   <img src="docs/screenshot-wheel.png" alt="The chart wheel, satellites included" width="47%">
 </p>
 
-**[→ Live demo](https://YOUR-USERNAME.github.io/orbital-oracle/)** ·
-![tests](https://github.com/YOUR-USERNAME/orbital-oracle/actions/workflows/test.yml/badge.svg)
+**[→ Live demo](https://yllnoreshehi.github.io/orbital-oracle/)** ·
+![tests](https://github.com/yllnoreshehi/orbital-oracle/actions/workflows/test.yml/badge.svg)
 
 ## Why it's built this way
 

@@ -5,9 +5,9 @@
 A zero-backend web app that computes your **real natal chart** — tropical zodiac,
 Placidus houses, arcminute-accurate planetary positions — and delivers a daily
 horoscope in the voice of a fantasy academy's morning prophecies. Its one
-modern contribution to a very old art: it also tracks **actual satellites**
-(Starlink, the ISS, Hubble, one long-dead Envisat) through your houses via live
-orbital data, because no birth chart drawn after 1957 is truly complete.
+modern contribution to a very old art: it also reads the **actual satellites**
+overhead (Starlink, the ISS, Hubble, one long-dead Envisat) as chart placements,
+because no birth chart drawn after 1957 is truly complete.
 
 <p align="center">
   <img src="docs/screenshot-reading.png" alt="A daily reading" width="47%">
@@ -31,14 +31,65 @@ reference values, and requires agreement within 0.01°.
 | Planetary positions | [astronomy-engine](https://github.com/cosinekitty/astronomy) (VSOP87-based, MIT) |
 | Houses | Placidus cusps solved numerically from sidereal time + coordinates; whole-sign fallback near the polar circles |
 | Historical timezones | [tz-lookup](https://github.com/darkskyapp/tz-lookup) + the browser's IANA database — a 1991 birth gets its correct 1991 UTC offset |
-| Satellites | Live [CelesTrak](https://celestrak.org) element sets, SGP4-propagated with [satellite.js](https://github.com/shashwatak/satellite-js), mapped to ecliptic longitude → sign → natal house (bundled fallback for offline use) |
-| Geocoding | [Nominatim](https://nominatim.openstreetmap.org), with a built-in city atlas and manual coordinates as fallbacks |
+| Satellites | Live [CelesTrak](https://celestrak.org) element sets, SGP4-propagated with [satellite.js](https://github.com/shashwatak/satellite-js), mapped to ecliptic longitude → zodiac sign → natal house (bundled fallback for offline use) |
+| Place search | [Nominatim](https://nominatim.openstreetmap.org) autocomplete, with a built-in city atlas and manual coordinates as fallbacks |
 | The daily message | Seeded generator referencing *real* transits — today's Moon sign, live aspects to your natal Sun, whether Mercury is genuinely retrograde. Deterministic per person per day: same prophecy all day, a new one at midnight, as a respectable horoscope demands |
 
-The message engine is honest about its genre: the astronomy is real,
-the interpretation is theatre.
+## Reading the satellites
 
-## Run it
+There is no astrological tradition for artificial satellites. There is, however,
+a documented method for giving meaning to newly discovered bodies, and
+astrologers have used it for two centuries: **the meaning is derived from the
+name the object was given, and the story attached to it.** Ceres signifies
+nurture because Ceres is Demeter, who lost a daughter and starved the world in
+grief. Chiron — found in 1977, named for the centaur healer who could cure
+anyone but himself — became the "wounded healer."
+
+Satellites have names, missions and fates that are frankly more mythic than some
+asteroids'. So each object is read the same way, from documented history:
+
+| Object | Archetype | Derived from |
+|---|---|---|
+| ISS (Zarya) | The Negotiated Peace | Assembled by former rivals; inhabited without a break since 2000; works only because crews rotate out |
+| Hubble | The Corrected Vision | Launched in 1990 with a precisely wrong mirror; publicly humiliated; repaired in orbit in 1993; became the most productive observatory in history |
+| Tiangong | The Door You Built Yourself | Built after a 2011 US law barred NASA from bilateral cooperation with China |
+| Starlink | The Multitude | Thousands of identical units; no individual one matters; the service that is also the noise |
+| NAVSTAR (GPS) | The Indifferent Witness | Knows your position to three metres and has no view on what you do there |
+| Iridium | The Faded Flare | Its first generation threw flares brighter than Venus; the company went bankrupt in two years; the replacements don't flare at all |
+| Envisat | The Unanswered Message | Went silent in April 2012 with no cause ever found; uncontactable, unremovable, in orbit for another 150 years |
+| Vanguard 1 | The Ancestor | Launched 1958, silent since 1964, still the oldest human object in orbit |
+| NOAA 19 | The Dropped Thing That Flew Anyway | Fell off its assembly cart in 2003 because another team had borrowed the bolts; ~$135M damage; rebuilt, launched, still working |
+
+Every reading in the app shows its own derivation, so the reasoning can be
+argued with rather than taken on faith. Each placement combines the archetype
+with the natal house it falls in and the sign it occupies — the same way a
+planetary placement is read.
+
+<p align="center">
+  <img src="docs/screenshot-satellite.png" alt="An expanded satellite reading" width="80%">
+</p>
+
+The app is honest about its standing: even asteroid astrology is minority
+practice, and satellite astrology is practised by nobody at all — unless you
+count Zhanyi Chen's 2023 art installation, which built satellite natal charts to
+ask what we are doing to the sky.
+
+## Learning your own chart
+
+Every placement row opens into a plain-language explanation built on how
+astrology is actually taught — planet = *what* part of life, sign = *how* it
+behaves, house = *where* it shows up — plus the Ascendant and Midheaven, a
+primer on all twelve houses, and what a retrograde at birth is taken to mean.
+No prior knowledge assumed.
+
+## Install it on your phone
+
+It's a progressive web app. On iPhone: open the live demo in Safari → Share →
+**Add to Home Screen**. You get an icon, a full-screen app with no browser
+chrome, and a service worker that caches everything, so your chart still
+computes with no signal. On Android, Chrome offers to install it directly.
+
+## Run it locally
 
 ```bash
 npx serve .          # or: python3 -m http.server
@@ -50,26 +101,30 @@ No build step. No runtime dependencies — the three libraries are vendored in
 ### Deploy on GitHub Pages
 
 Push to GitHub → repo **Settings → Pages → Deploy from a branch** → `main`,
-root folder. Done. A weekly GitHub Action keeps the bundled satellite elements
-fresh; CI runs the ephemeris test suite on every push.
+root folder. A weekly GitHub Action keeps the bundled satellite elements fresh;
+CI runs the ephemeris test suite on every push.
 
 ## Project layout
 
 ```
-index.html            the reading room
-css/style.css         night sky, gold ink, book typography
-js/chart.js           natal chart math — planets, ASC/MC, Placidus   [tested]
-js/satellites.js      TLE fetch + SGP4 → signs & houses              [tested]
-js/horoscope.js       the voice: seeded daily message generator      [tested]
-js/share.js           canvas renderer: reading → shareable PNG
-js/app.js             form, geocoding, timezone handling, SVG wheel
-data/tle-fallback.js  bundled orbital elements for offline mode
-tools/                fallback refresh scripts
-test/test.js          regression vs. Swiss Ephemeris reference values
+index.html              the reading room
+css/style.css           night sky, gold ink, book typography
+js/chart.js             natal chart math — planets, ASC/MC, Placidus   [tested]
+js/satellites.js        TLE fetch + SGP4 → signs & houses              [tested]
+js/interpretations.js   what planets, signs and houses mean            [tested]
+js/lore.js              satellite archetypes and their derivations     [tested]
+js/horoscope.js         the voice: seeded daily message generator      [tested]
+js/share.js             canvas renderer: reading → shareable PNG
+js/app.js               autocomplete, timezone handling, SVG wheel, expanders
+sw.js + manifest        offline support and home-screen install
+data/tle-fallback.js    bundled orbital elements for offline mode
+tools/                  fallback refresh scripts
+test/test.js            regression vs. Swiss Ephemeris + content coverage
 ```
 
 ```bash
-npm install && npm test    # 8 checks incl. cross-hemisphere + polar edge cases
+npm install && npm test    # ephemeris accuracy, edge cases, and every
+                           # satellite reading in all 12 houses and signs
 npm run refresh-tles       # update bundled satellite elements from CelesTrak
 ```
 

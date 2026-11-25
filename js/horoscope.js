@@ -4,9 +4,10 @@
  * paragraph is where the modern sky gets a word in.
  * Browser global: Oracle_ ; node: module.exports. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) { module.exports = factory(); }
-  else { root.Oracle_ = factory(); }
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('./lore.js'));
+  } else { root.Oracle_ = factory(root.Lore_); }
+})(typeof self !== 'undefined' ? self : this, function (Lore) {
   'use strict';
 
   const SIGNS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
@@ -140,6 +141,9 @@
     'Above the clouds but below the myths, the hardware weighs in.',
   ];
 
+  /* Satellite house lines are composed in lore.js from each object's real
+   * history, the way asteroid meanings are derived from their namesakes. */
+
   const SAT_HOUSE_LINES = {
     crowd: [
       '{label} is transiting your {houseOrd} house of {houseTheme} — as are its four hundred nearest siblings, so whatever influence it carries arrives in bulk.',
@@ -219,21 +223,17 @@
     bits.push(pick(rng, COUNSEL_LINES));
     paras.push(bits.join(' '));
 
-    // paragraph 3: the satellites
+    // paragraph 3: the satellites, read from their own histories
     const satBits = [pick(rng, SAT_INTROS)];
     const chosen = pickN(rng, satellites, Math.min(2, satellites.length));
     for (const s of chosen) {
-      const pool = SAT_HOUSE_LINES[s.vibe] || SAT_HOUSE_LINES.mystery;
-      let line = fill(pick(rng, pool), {
-        label: s.label.charAt(0).toUpperCase() + s.label.slice(1),
-        houseOrd: ORDINALS[s.house], houseTheme: HOUSE_THEMES[s.house],
-      });
-      if (s.aboveHorizon && rng() < 0.5) {
+      let line = Lore.dailyLine(s, rng);
+      if (s.aboveHorizon && rng() < 0.4) {
         line += ' ' + fill(pick(rng, SAT_HORIZON_LINES), { elev: Math.round(s.elevation) });
       }
       satBits.push(line);
     }
-    if (rng() < 0.8) satBits.push(pick(rng, SAT_CODAS));
+    if (rng() < 0.7) satBits.push(pick(rng, SAT_CODAS));
     paras.push(satBits.join(' '));
 
     return {

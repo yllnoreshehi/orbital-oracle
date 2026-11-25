@@ -1,9 +1,11 @@
-/* app.js — wiring: form → geocode → timezone → charts → oracle → DOM. */
+/* app.js — wiring: form → place autocomplete → timezone → charts → oracle → DOM. */
 (function () {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
   const SIGNS = Chart_.SIGNS, GLYPHS = Chart_.SIGN_GLYPHS;
+  const esc = (s) => String(s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ---------- built-in gazetteer (offline fallback for geocoding) ---------- */
   const CITIES = {
@@ -42,23 +44,144 @@
     'tirana': [41.3275, 19.8187], 'skopje': [41.9973, 21.4280],
   };
 
-  async function geocode(place) {
-    // 1) "lat, lon" typed directly
-    const m = place.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
-    if (m) return { lat: +m[1], lon: +m[2], label: 'coordinates' };
-    // 2) Nominatim (OpenStreetMap)
+  function gazetteerMatches(q) {
+    const key = q.toLowerCase().trim();
+    if (!key) return [];
+    return Object.keys(CITIES)
+      .filter(c => c.startsWith(key))
+      .slice(0, 6)
+      .map(c => ({
+        label: c.replace(/\b\w/g, m => m.toUpperCase()),
+        detail: 'built-in atlas', offline: true,
+        lat: CITIES[c][0], lon: CITIES[c][1],
+      }));
+  }
+
+  /* ---------- place autocomplete ---------- */
+  const AC = { timer: null, items: [], index: -1, chosen: null, seq: 0 };
+
+  async function searchPlaces(q) {
+    // explicit "lat, lon"
+    const m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m) {
+      return [{ label: `${(+m[1]).toFixed(4)}, ${(+m[2]).toFixed(4)}`, detail: 'coordinates',
+        lat: +m[1], lon: +m[2] }];
+    }
     try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' +
-        encodeURIComponent(place), { headers: { 'Accept': 'application/json' } });
+      const r = await fetch(
+        'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=en&q=' +
+        encodeURIComponent(q), { headers: { Accept: 'application/json' } });
       if (r.ok) {
         const js = await r.json();
-        if (js.length) return { lat: +js[0].lat, lon: +js[0].lon, label: js[0].display_name.split(',').slice(0, 2).join(',') };
+        if (js.length) {
+          return js.map(p => {
+            const bits = p.display_name.split(',').map(s => s.trim());
+            return {
+              label: bits[0],
+              detail: bits.slice(1).filter(Boolean).slice(-2).join(', '),
+              lat: +p.lat, lon: +p.lon,
+            };
+          });
+        }
       }
-    } catch (e) { /* offline — try gazetteer */ }
-    // 3) built-in list
-    const key = place.toLowerCase().split(',')[0].trim();
-    if (CITIES[key]) return { lat: CITIES[key][0], lon: CITIES[key][1], label: place + ' (built-in atlas)' };
-    return null;
+    } catch (e) { /* offline — fall through to the built-in atlas */ }
+    return gazetteerMatches(q);
+  }
+
+  function renderSuggestions(items) {
+    const box = $('place-suggest');
+    AC.items = items; AC.index = -1;
+    if (!items.length) { closeSuggestions(); return; }
+    box.innerHTML = items.map((it, i) =>
+      `<li role="option" id="place-opt-${i}" data-i="${i}" aria-selected="false">` +
+      `<span class="sg-name">${esc(it.label)}</span>` +
+      (it.detail ? `<span class="sg-detail">${esc(it.detail)}</span>` : '') + '</li>').join('');
+    box.hidden = false;
+    $('in-place').setAttribute('aria-expanded', 'true');
+  }
+
+  function closeSuggestions() {
+    const box = $('place-suggest');
+    box.hidden = true; box.innerHTML = '';
+    AC.items = []; AC.index = -1;
+    $('in-place').setAttribute('aria-expanded', 'false');
+    $('in-place').removeAttribute('aria-activedescendant');
+  }
+
+  function highlight(i) {
+    const box = $('place-suggest');
+    Array.from(box.children).forEach((li, k) => {
+      const on = k === i;
+      li.classList.toggle('active', on);
+      li.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    AC.index = i;
+    if (i >= 0) {
+      $('in-place').setAttribute('aria-activedescendant', 'place-opt-' + i);
+      box.children[i].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function choosePlace(i) {
+    const it = AC.items[i];
+    if (!it) return;
+    AC.chosen = it;
+    $('in-place').value = (it.detail && !it.offline && it.detail !== 'coordinates')
+      ? `${it.label}, ${it.detail}` : it.label;
+    $('place-confirm').textContent =
+      `✓ ${it.label} — ${it.lat.toFixed(3)}°, ${it.lon.toFixed(3)}°`;
+    $('place-confirm').hidden = false;
+    closeSuggestions();
+  }
+
+  function wirePlaceInput() {
+    const input = $('in-place');
+    input.addEventListener('input', () => {
+      AC.chosen = null;
+      $('place-confirm').hidden = true;
+      clearTimeout(AC.timer);
+      const q = input.value.trim();
+      if (q.length < 2) { closeSuggestions(); return; }
+      // show the offline atlas instantly, then refine with Nominatim
+      const quick = gazetteerMatches(q);
+      if (quick.length) renderSuggestions(quick);
+      AC.timer = setTimeout(async () => {
+        const seq = ++AC.seq;
+        const items = await searchPlaces(q);
+        if (seq === AC.seq && input.value.trim() === q) renderSuggestions(items);
+      }, 350);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if ($('place-suggest').hidden) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(AC.index + 1, AC.items.length - 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(AC.index - 1, 0)); }
+      else if (e.key === 'Enter') {
+        if (AC.index >= 0) { e.preventDefault(); choosePlace(AC.index); }
+      } else if (e.key === 'Escape') { closeSuggestions(); }
+    });
+
+    $('place-suggest').addEventListener('mousedown', (e) => {
+      const li = e.target.closest('li[data-i]');
+      if (li) { e.preventDefault(); choosePlace(+li.dataset.i); }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.place-field')) closeSuggestions();
+    });
+  }
+
+  /** Resolve whatever is in the form into coordinates. */
+  async function resolvePlace() {
+    const manualLat = parseFloat($('in-lat').value), manualLon = parseFloat($('in-lon').value);
+    if (!isNaN(manualLat) && !isNaN(manualLon)) {
+      return { lat: manualLat, lon: manualLon, label: 'manual coordinates' };
+    }
+    if (AC.chosen) return AC.chosen;
+    const q = $('in-place').value.trim();
+    if (!q) return null;
+    const hits = await searchPlaces(q);
+    return hits.length ? hits[0] : null;
   }
 
   /* ---------- local birth time + IANA zone → UTC Date ---------- */
@@ -96,19 +219,16 @@
     s += '<circle cx="300" cy="300" r="252" fill="none" stroke="#d4b46a44" stroke-width="1"/>';
     s += '<circle cx="300" cy="300" r="216" fill="none" stroke="#d4b46a44" stroke-width="1"/>';
     s += '<circle cx="300" cy="300" r="120" fill="none" stroke="#d4b46a22" stroke-width="1"/>';
-    // sign boundaries + glyphs
     for (let i = 0; i < 12; i++) {
       const [x1, y1] = pt(i * 30, 216), [x2, y2] = pt(i * 30, 252);
       s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d4b46a55" stroke-width="1"/>`;
       const [gx, gy] = pt(i * 30 + 15, 234);
       s += `<text x="${gx}" y="${gy}" fill="#d4b46a" font-size="19" text-anchor="middle" dominant-baseline="central">${GLYPHS[i]}︎</text>`;
     }
-    // degree ticks
     for (let d = 0; d < 360; d += 10) {
       const [x1, y1] = pt(d, 216), [x2, y2] = pt(d, d % 30 === 0 ? 216 : 210);
       if (d % 30 !== 0) s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d4b46a33" stroke-width="1"/>`;
     }
-    // house cusps
     for (let h = 1; h <= 12; h++) {
       const strong = h === 1 || h === 4 || h === 7 || h === 10;
       const [x1, y1] = pt(chart.cusps[h], 120), [x2, y2] = pt(chart.cusps[h], 216);
@@ -117,12 +237,10 @@
       const [nx, ny] = pt(mid, 134);
       s += `<text x="${nx}" y="${ny}" fill="#6a6478" font-size="11" text-anchor="middle" dominant-baseline="central">${h}</text>`;
     }
-    // ASC / MC labels
     const [ax, ay] = pt(chart.asc, 264);
     const [mx, my] = pt(chart.mc, 264);
     s += `<text x="${ax}" y="${ay}" fill="#e8e4d8" font-size="12" text-anchor="middle" dominant-baseline="central" font-family="monospace">ASC</text>`;
     s += `<text x="${mx}" y="${my}" fill="#e8e4d8" font-size="12" text-anchor="middle" dominant-baseline="central" font-family="monospace">MC</text>`;
-    // planets (spread near-conjunct glyphs onto two radii)
     const sorted = chart.planets.slice().sort((a, b) => a.lon - b.lon);
     let lastLon = -99, flip = false;
     for (const p of sorted) {
@@ -136,7 +254,6 @@
       const [tx, ty] = pt(p.lon, 208);
       s += `<circle cx="${tx}" cy="${ty}" r="1.8" fill="#e8e4d8"/>`;
     }
-    // satellites — the outer heresy ring
     let lastSatLon = -99; flip = false;
     const satsSorted = sats.slice().sort((a, b) => a.lon - b.lon);
     for (const sat of satsSorted) {
@@ -150,21 +267,122 @@
     $('wheel').innerHTML = s;
   }
 
-  /* ---------- tables ---------- */
+  /* ---------- expandable tables ---------- */
+  function detailRow(id, cols, html) {
+    return `<tr class="detail-row" id="${id}" hidden><td colspan="${cols}">${html}</td></tr>`;
+  }
+
+  function planetDetail(p) {
+    const x = Lex_.explainPlacement(p);
+    return `<div class="detail">
+      <h4>${esc(x.headline)}</h4>
+      <p class="detail-q">${esc(x.question)}</p>
+      <dl>
+        <dt>The planet</dt><dd>${esc(x.what)}</dd>
+        <dt>The sign</dt><dd>${esc(x.how)}</dd>
+        <dt>The house</dt><dd>${esc(x.where)} ${esc(Lex_.HOUSES[p.house].long)}</dd>
+        ${x.retro ? `<dt>Retrograde</dt><dd>${esc(x.retro)}</dd>` : ''}
+      </dl>
+      <p class="detail-sum">${esc(x.together)}</p>
+      <p class="detail-facts">${esc(x.facts.element)} · ${esc(x.facts.modality)} · ${esc(x.facts.ruler)} · orbit: ${esc(x.facts.cycle)}</p>
+    </div>`;
+  }
+
+  function satelliteDetail(sat) {
+    const r = Lore_.readSatellite(sat);
+    return `<div class="detail sat-detail">
+      <h4>${esc(r.headline)}</h4>
+      <p class="detail-q">${esc(r.archetype)}${r.strong ? ' · strong placement' : ''}</p>
+      <p>${esc(r.core)}</p>
+      <p>${esc(r.inflect)}</p>
+      <p class="detail-shadow">${esc(r.shadow)}</p>
+      <dl>
+        <dt>The name</dt><dd>${esc(r.namesake)}</dd>
+        <dt>Why it means that</dt><dd>${esc(r.derivation)}</dd>
+      </dl>
+      <p class="detail-facts">${esc(r.formal)} · ${esc(r.launched)} · ${esc(r.horizon)}</p>
+    </div>`;
+  }
+
   function fillTables(chart, sats, satMeta) {
+    // planets
     const pb = $('tbl-planets').querySelector('tbody');
-    pb.innerHTML = chart.planets.map(p =>
-      `<tr><td class="glyph">${p.glyph}︎</td><td>${p.name}</td>` +
-      `<td>${p.signGlyph}︎ ${p.signName}</td><td>${p.degree}</td><td>${p.house}</td>` +
-      `<td>${p.retrograde ? '<span class="rx">retrograde</span>' : ''}</td></tr>`).join('');
+    pb.innerHTML = chart.planets.map((p, i) => {
+      const did = 'pd-' + i;
+      return `<tr class="expandable" tabindex="0" role="button" aria-expanded="false" aria-controls="${did}" data-target="${did}">
+        <td class="glyph">${p.glyph}︎</td><td>${p.name}</td>
+        <td>${p.signGlyph}︎ ${p.signName}</td><td>${p.degree}</td><td>${p.house}</td>
+        <td>${p.retrograde ? '<span class="rx">retrograde</span>' : ''}</td>
+        <td class="chev" aria-hidden="true">›</td></tr>` +
+        detailRow(did, 7, planetDetail(p));
+    }).join('');
+
+    // angles
+    const ab = $('tbl-angles').querySelector('tbody');
+    const angles = [
+      { key: 'asc', name: 'Ascendant', lon: chart.asc, sign: chart.ascSign },
+      { key: 'mc', name: 'Midheaven', lon: chart.mc, sign: chart.mcSign },
+    ];
+    ab.innerHTML = angles.map((a, i) => {
+      const did = 'ad-' + i;
+      const x = Lex_.explainAngle(a.key, a.sign);
+      const html = `<div class="detail"><h4>${esc(x.headline)}</h4>
+        <dl><dt>What it is</dt><dd>${esc(x.what)}</dd>
+        <dt>In your chart</dt><dd>${esc(x.how)}</dd></dl>
+        <p class="detail-sum">${esc(x.together)}</p></div>`;
+      return `<tr class="expandable" tabindex="0" role="button" aria-expanded="false" aria-controls="${did}" data-target="${did}">
+        <td class="glyph">${a.key === 'asc' ? 'ASC' : 'MC'}</td><td>${a.name}</td>
+        <td>${GLYPHS[a.sign]}︎ ${SIGNS[a.sign]}</td><td>${Chart_.fmtDegree(a.lon)}</td>
+        <td class="chev" aria-hidden="true">›</td></tr>` + detailRow(did, 5, html);
+    }).join('');
+
+    // satellites
     const sb = $('tbl-sats').querySelector('tbody');
-    sb.innerHTML = sats.map(sat =>
-      `<tr><td class="glyph">🛰</td><td>${sat.name}</td>` +
-      `<td>${GLYPHS[sat.sign]}︎ ${SIGNS[sat.sign]}</td><td>${sat.house} — ${Oracle_.HOUSE_THEMES[sat.house]}</td>` +
-      `<td>${sat.aboveHorizon ? '↑ above your horizon' : 'below horizon'}</td></tr>`).join('');
+    sb.innerHTML = sats.map((sat, i) => {
+      const did = 'sd-' + i;
+      const lore = Lore_.LORE[sat.key] || Lore_.LORE.unknown;
+      return `<tr class="expandable" tabindex="0" role="button" aria-expanded="false" aria-controls="${did}" data-target="${did}">
+        <td class="glyph">🛰</td><td>${esc(sat.name)}</td>
+        <td class="sat-arch">${esc(lore.archetype)}</td>
+        <td>${GLYPHS[sat.sign]}︎ ${SIGNS[sat.sign]}</td>
+        <td>${sat.house} — ${esc(Lex_.HOUSES[sat.house].title)}</td>
+        <td class="chev" aria-hidden="true">›</td></tr>` +
+        detailRow(did, 6, satelliteDetail(sat));
+    }).join('');
+
     $('data-note').textContent = satMeta.source === 'live'
       ? 'Satellite orbits: live element sets from CelesTrak.'
       : 'Satellite orbits: bundled element sets (offline mode) — positions are approximate until the app can reach CelesTrak.';
+  }
+
+  function toggleRow(tr) {
+    const det = document.getElementById(tr.dataset.target);
+    if (!det) return;
+    const open = !det.hidden;
+    det.hidden = open;
+    tr.setAttribute('aria-expanded', open ? 'false' : 'true');
+    tr.classList.toggle('open', !open);
+  }
+
+  function wireExpanders() {
+    document.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr.expandable');
+      if (tr) toggleRow(tr);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tr = e.target.closest && e.target.closest('tr.expandable');
+      if (tr) { e.preventDefault(); toggleRow(tr); }
+    });
+  }
+
+  /* ---------- the houses primer ---------- */
+  function fillPrimer() {
+    $('houses-primer').innerHTML = Lex_.HOUSES.slice(1).map((h, i) =>
+      `<details class="primer-item"><summary><span class="primer-n">${i + 1}</span> ${esc(h.title)}</summary>
+       <p>${esc(h.long)}</p></details>`).join('');
+    $('method-note').textContent = Lore_.METHOD_NOTE;
+    $('method-caveat').textContent = Lore_.CAVEAT;
   }
 
   /* ---------- main flow ---------- */
@@ -176,18 +394,14 @@
 
     try {
       status.textContent = 'Locating your beginnings…';
-      let lat = parseFloat($('in-lat').value), lon = parseFloat($('in-lon').value);
-      let placeLabel = $('in-place').value.trim();
-      if (isNaN(lat) || isNaN(lon)) {
-        const g = await geocode(placeLabel);
-        if (!g) {
-          status.textContent = 'Could not find that place — try "City, Country", or enter coordinates manually below.';
-          status.classList.add('err');
-          btn.disabled = false;
-          return;
-        }
-        lat = g.lat; lon = g.lon;
+      const place = await resolvePlace();
+      if (!place) {
+        status.textContent = 'Pick a place from the list, or enter coordinates under "Enter coordinates manually".';
+        status.classList.add('err');
+        btn.disabled = false;
+        return;
       }
+      const { lat, lon } = place;
 
       status.textContent = 'Consulting the ephemeris…';
       const zone = (typeof tzlookup === 'function') ? tzlookup(lat, lon) : 'UTC';
@@ -206,15 +420,20 @@
         norm180: Chart_.norm180,
       });
 
-      // render
       $('msg-date').textContent = now.toLocaleDateString(undefined,
         { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       $('msg-greeting').textContent = msg.greeting;
       $('msg-tagline').textContent = msg.tagline;
       $('msg-body').innerHTML = msg.paragraphs.map((p, i) =>
-        `<p${i === msg.paragraphs.length - 1 ? ' class="sat-para"' : ''}>${p}</p>`).join('');
+        `<p${i === msg.paragraphs.length - 1 ? ' class="sat-para"' : ''}>${esc(p)}</p>`).join('');
+      const placeLabel = (place.detail && !place.offline && place.detail !== 'coordinates')
+        ? `${place.label}, ${place.detail}` : place.label;
+      $('chart-for').textContent =
+        `${placeLabel} · ${lat.toFixed(2)}°, ${lon.toFixed(2)}° · ` +
+        `${$('in-date').value} ${$('in-time').value} · ${zone} · ${natal.houseSystem} houses`;
       drawWheel(natal, sats);
       fillTables(natal, sats, satMeta);
+      fillPrimer();
 
       $('reading').classList.remove('hidden');
       $('form-card').classList.add('hidden');
@@ -224,7 +443,8 @@
       try {
         localStorage.setItem('starscope-birth', JSON.stringify({
           date: $('in-date').value, time: $('in-time').value,
-          place: placeLabel, lat, lon,
+          place: $('in-place').value, lat, lon,
+          label: place.label, detail: place.detail,
         }));
       } catch (e) {}
     } catch (err) {
@@ -242,12 +462,23 @@
       $('reading').classList.add('hidden');
       $('form-card').classList.remove('hidden');
     });
+    wirePlaceInput();
+    wireExpanders();
     try {
       const saved = JSON.parse(localStorage.getItem('starscope-birth'));
       if (saved) {
         $('in-date').value = saved.date; $('in-time').value = saved.time;
         $('in-place').value = saved.place;
+        if (typeof saved.lat === 'number') {
+          AC.chosen = { lat: saved.lat, lon: saved.lon, label: saved.label || saved.place, detail: saved.detail };
+          $('place-confirm').textContent =
+            `✓ ${AC.chosen.label} — ${saved.lat.toFixed(3)}°, ${saved.lon.toFixed(3)}°`;
+          $('place-confirm').hidden = false;
+        }
       }
     } catch (e) {}
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
   });
 })();

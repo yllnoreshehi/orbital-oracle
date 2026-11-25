@@ -66,6 +66,67 @@ check('satellites all placed with sign + house', () => {
     assert(s.house >= 1 && s.house <= 12);
   }
 });
+check('every planet, sign and house has interpretation copy', () => {
+  const Lex = require('../js/interpretations.js');
+  assert.strictEqual(Lex.SIGNS.length, 12);
+  assert.strictEqual(Lex.HOUSES.length, 13);
+  for (const p of natal.planets) {
+    assert(Lex.PLANETS[p.name], 'missing planet copy: ' + p.name);
+    const x = Lex.explainPlacement(p);
+    for (const k of ['headline', 'question', 'what', 'how', 'where', 'together']) {
+      assert(x[k] && x[k].length > 10, `${p.name}.${k} too short`);
+    }
+    assert(!/\bi\b/.test(x.together), 'stray lowercase I in: ' + x.together);
+  }
+  for (let h = 1; h <= 12; h++) {
+    assert(Lex.HOUSES[h].title && Lex.HOUSES[h].domain && Lex.HOUSES[h].long, 'house ' + h);
+  }
+  for (const which of ['asc', 'mc']) {
+    const a = Lex.explainAngle(which, 3);
+    assert(a.headline && a.what && a.how);
+  }
+});
+
+check('every satellite has lore, and readings compose in all 12 houses', () => {
+  const Lore = require('../js/lore.js');
+  const S2 = require('../js/satellites.js');
+  const placed = S2.placeSatellites(TLE, new Date(), natal, C.houseOf);
+  for (const sat of placed) {
+    const lore = Lore.LORE[sat.key];
+    assert(lore, 'no lore for key: ' + sat.key);
+    for (const k of ['archetype', 'namesake', 'derivation', 'signifies', 'shadow', 'launched']) {
+      assert(lore[k] && lore[k].length > 3, `${sat.key}.${k} missing`);
+    }
+    // the reading must compose cleanly in every house and sign
+    for (let h = 1; h <= 12; h++) {
+      for (let sg = 0; sg < 12; sg++) {
+        const r = Lore.readSatellite(Object.assign({}, sat, { house: h, sign: sg }));
+        assert(r.headline && r.core && r.inflect && r.shadow, `${sat.key} h${h} s${sg}`);
+        assert(r.core.indexOf('undefined') === -1, 'undefined in reading');
+        assert(r.core.indexOf('{') === -1, 'unfilled template in reading');
+      }
+    }
+  }
+  assert(Lore.METHOD_NOTE.length > 100 && Lore.CAVEAT.length > 100);
+});
+
+check('satellite daily lines never leak templates', () => {
+  const Lore = require('../js/lore.js');
+  const S2 = require('../js/satellites.js');
+  const placed = S2.placeSatellites(TLE, new Date(), natal, C.houseOf);
+  let n = 0;
+  for (let seed = 0; seed < 200; seed++) {
+    let s = seed + 1;
+    const rng = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
+    for (const sat of placed) {
+      const line = Lore.dailyLine(sat, rng);
+      assert(line.indexOf('{') === -1 && line.indexOf('undefined') === -1, line);
+      n++;
+    }
+  }
+  assert(n > 1000, 'expected many lines, got ' + n);
+});
+
 check('oracle is deterministic per day and varies across days', () => {
   const now = new Date();
   const transits = C.computeChart(now, 46.8065, 7.1620);

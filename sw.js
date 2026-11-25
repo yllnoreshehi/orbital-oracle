@@ -6,11 +6,13 @@
  * one at install time. Correctness beats a few saved milliseconds; the cache
  * is still there the moment the network isn't.
  */
-const VERSION = 'orbital-oracle-v3';
+const VERSION = 'orbital-oracle-v4';
 const SHELL = [
   './',
   './index.html',
   './css/style.css',
+  './js/push-config.js',
+  './js/notify.js',
   './js/chart.js',
   './js/interpretations.js',
   './js/lore.js',
@@ -44,6 +46,34 @@ self.addEventListener('activate', (e) => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)));
     await self.clients.claim();
+  })());
+});
+
+/* ---------- the morning notification ---------- */
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (err) { data = { body: e.data && e.data.text() }; }
+  const title = data.title || 'Good Morning.';
+  const body = data.body || 'The stars have spoken about your day.';
+  e.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: 'daily-horoscope',          // a new one replaces yesterday's
+    renotify: true,
+    data: { url: data.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) {
+      if ('focus' in c) { await c.focus(); return; }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
   })());
 });
 

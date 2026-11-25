@@ -89,6 +89,21 @@ It's a progressive web app. On iPhone: open the live demo in Safari → Share �
 chrome, and a service worker that caches everything, so your chart still
 computes with no signal. On Android, Chrome offers to install it directly.
 
+### Morning notifications
+
+The app can push you the day's horoscope when you wake up — no App Store, no
+developer account, no server. Because the chart and message code runs unchanged
+in Node, a scheduled GitHub Action computes exactly what the website would show
+and sends it over Web Push (iOS 16.4+, Home Screen install required by Apple).
+
+Setup is four secrets and a key pair: **[docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)**.
+
+```bash
+# see what it would send, without sending it
+BIRTH='{"date":"1991-08-11","time":"22:35","lat":46.8065,"lon":7.162}' \
+  node tools/daily-push.js --dry-run
+```
+
 ## Run it locally
 
 ```bash

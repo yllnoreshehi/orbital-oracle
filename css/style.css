@@ -262,6 +262,31 @@ tr.expandable.open { background: rgba(212,180,106,.07); }
 .explainer p { margin-left: 0; }
 .explainer-caveat { color: var(--ink-faint); font-size: .94rem; font-style: italic; }
 
+/* ————— morning notifications ————— */
+.notify-status {
+  font-style: italic; color: var(--ink-dim); font-size: .96rem;
+  margin: .8rem 0 0; max-width: 54ch;
+}
+.notify-status.ok { color: var(--gold); }
+.notify-status.err { color: #d99; }
+.notify-status code, .notify-label code {
+  font-family: var(--mono); font-size: .85em; font-style: normal;
+  color: var(--gold-soft); background: rgba(212,180,106,.1);
+  padding: .1em .35em; border-radius: 4px;
+}
+.notify-label {
+  display: block; font-style: italic; color: var(--ink-dim);
+  font-size: .92rem; margin: 1.1rem 0 .4rem;
+}
+#notify-sub {
+  width: 100%; font-family: var(--mono); font-size: .72rem;
+  background: rgba(10,10,22,.8); color: var(--ink-dim);
+  border: 1px solid rgba(212,180,106,.3); border-radius: 6px;
+  padding: .6rem; resize: vertical; word-break: break-all;
+}
+.notify-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+.notify-actions .ghost-btn { text-decoration: none; display: inline-block; }
+
 /* share overlay */
 #share-overlay {
   position: fixed; inset: 0; z-index: 50;

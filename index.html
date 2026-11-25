@@ -68,6 +68,24 @@
         <button type="button" class="ghost-btn" id="btn-share">Share as image ✦</button>
       </article>
 
+      <article class="card notify-card">
+        <h2 class="card-title">Every morning, on your phone</h2>
+        <p class="card-lede">Get this message as a notification when you wake up.
+          On iPhone, add this to your Home Screen first — Apple only allows
+          notifications for installed web apps.</p>
+        <button type="button" class="ghost-btn" id="btn-notify">Notify me each morning</button>
+        <p class="notify-status" id="notify-status"></p>
+        <div id="notify-result" hidden>
+          <label class="notify-label" for="notify-sub">This device's subscription — it goes in the
+            GitHub secret <code>PUSH_SUBSCRIPTION</code></label>
+          <textarea id="notify-sub" readonly rows="4" spellcheck="false"></textarea>
+          <div class="notify-actions">
+            <button type="button" class="ghost-btn" id="notify-copy">Copy</button>
+            <a class="ghost-btn" id="notify-mail" href="#">Email it to myself</a>
+          </div>
+        </div>
+      </article>
+
       <article class="card wheel-card">
         <h2 class="card-title">Your chart, annotated by modernity</h2>
         <p class="chart-for" id="chart-for"></p>
@@ -133,7 +151,7 @@
         <a href="https://github.com/shashwatak/satellite-js" rel="noopener">satellite.js</a> ·
         houses: Placidus</p>
       <p class="foot-dim">For entertainment. The satellites hold no opinion of you. Probably.</p>
-      <p class="foot-dim"><span id="build-tag">v2.1</span> · if this says v2.1, you are seeing the current build</p>
+      <p class="foot-dim"><span id="build-tag">v2.2</span> · if this says v2.2, you are seeing the current build</p>
     </footer>
   </main>
 
@@ -147,6 +165,8 @@
   <script src="js/satellites.js"></script>
   <script src="js/horoscope.js"></script>
   <script src="js/share.js"></script>
+  <script src="js/push-config.js"></script>
+  <script src="js/notify.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

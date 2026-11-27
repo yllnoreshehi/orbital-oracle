@@ -1,22 +1,62 @@
 name: morning horoscope
+
+# GitHub's scheduler is best-effort: it is currently running scheduled jobs
+# hours late and sometimes dropping them entirely. So rather than asking for
+# one precise moment, this tries every hour and only actually sends when it is
+# morning in Zürich — and only once per day. A delayed run is then harmless:
+# whichever attempt lands inside the window is the one that sends.
 on:
   schedule:
-    # 06:12 UTC — about 07:12 in Zürich in winter, 08:12 in summer.
-    # (GitHub cron is UTC only and cannot follow daylight saving.)
-    # The odd minute is deliberate: jobs scheduled on the hour queue behind
-    # everyone else's and get delayed.
-    - cron: '12 6 * * *'
+    - cron: '9 * * * *'
   workflow_dispatch: {}     # lets you fire one by hand from the Actions tab
+
+env:
+  SEND_TZ: Europe/Zurich    # your local time zone — handles summer time itself
+  WINDOW_START: '06:30'     # earliest you want to hear from the stars
+  WINDOW_END: '08:30'       # latest
+
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: is it morning where you are?
+        id: when
+        run: |
+          today=$(TZ="$SEND_TZ" date +%F)
+          now=$(TZ="$SEND_TZ" date +%H:%M)
+          echo "today=$today" >> "$GITHUB_OUTPUT"
+          if [[ "$now" > "$WINDOW_START" && "$now" < "$WINDOW_END" ]]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "It is $now in $SEND_TZ — inside the window, carrying on."
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "It is $now in $SEND_TZ — outside $WINDOW_START–$WINDOW_END, nothing to do."
+          fi
+
+      - name: has today's horoscope already gone out?
+        id: guard
+        if: steps.when.outputs.go == 'true'
+        uses: actions/cache/restore@v4
         with:
-          node-version: 20
+          path: .sent-marker
+          key: horoscope-sent-${{ steps.when.outputs.today }}
+
+      - name: decide
+        id: decide
+        if: steps.when.outputs.go == 'true' && steps.guard.outputs.cache-hit != 'true'
+        run: echo "send=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.decide.outputs.send == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.decide.outputs.send == 'true'
+        with:
+          node-version: 22
       - run: npm install
+        if: steps.decide.outputs.send == 'true'
+
       - name: send the morning horoscope
+        if: steps.decide.outputs.send == 'true'
         env:
           BIRTH: ${{ secrets.BIRTH }}
           PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
@@ -25,3 +65,14 @@ jobs:
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           APP_URL: ${{ vars.APP_URL }}
         run: node tools/daily-push.js
+
+      # Remember that today is done, so later attempts stay quiet.
+      - name: mark today as sent
+        if: steps.decide.outputs.send == 'true'
+        run: date -u > .sent-marker
+      - uses: actions/cache/save@v4
+        if: steps.decide.outputs.send == 'true'
+        continue-on-error: true
+        with:
+          path: .sent-marker
+          key: horoscope-sent-${{ steps.when.outputs.today }}
